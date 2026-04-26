@@ -1,5 +1,6 @@
 (function () {
   const LOGIN_ERROR_MESSAGE = "Login gagal. Cek username atau password.";
+  const LOCKOUT_ERROR_MESSAGE = "Terlalu banyak percobaan login. Coba lagi beberapa menit.";
   const RESET_CONFIRM_TEXT = "RESET ALIZZ";
 
   let products = [];
@@ -99,7 +100,9 @@
       const result = await safeJson(response);
 
       if (!response.ok || !result.ok) {
-        error.textContent = result.message || LOGIN_ERROR_MESSAGE;
+        error.textContent = response.status === 429
+          ? LOCKOUT_ERROR_MESSAGE
+          : result.message || LOGIN_ERROR_MESSAGE;
         return;
       }
 
