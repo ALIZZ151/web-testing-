@@ -14,16 +14,18 @@ const {
 } = require("../lib/rateLimit");
 
 const GENERIC_LOGIN_ERROR = "Login gagal. Cek username atau password.";
+const LOCKOUT_LOGIN_ERROR = "Terlalu banyak percobaan login. Coba lagi beberapa menit.";
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);
 
-  const identifier = getClientIp(req);
+  const clientIp = getClientIp(req);
+  const identifier = `login:${clientIp}`;
   const rateLimit = checkRateLimit(identifier);
 
   if (rateLimit.limited) {
     res.setHeader("Retry-After", String(rateLimit.retryAfterSeconds));
-    return json(res, 429, { ok: false, message: GENERIC_LOGIN_ERROR });
+    return json(res, 429, { ok: false, message: LOCKOUT_LOGIN_ERROR });
   }
 
   if (!isAuthConfigured()) {
@@ -47,7 +49,13 @@ module.exports = async function handler(req, res) {
   const passwordMatches = verifyPassword(password, process.env.ADMIN_PASSWORD_HASH);
 
   if (!usernameMatches || !passwordMatches) {
-    recordFailure(identifier);
+    const failedLimit = recordFailure(identifier);
+
+    if (failedLimit.limited) {
+      res.setHeader("Retry-After", String(failedLimit.retryAfterSeconds));
+      return json(res, 429, { ok: false, message: LOCKOUT_LOGIN_ERROR });
+    }
+
     return json(res, 401, { ok: false, message: GENERIC_LOGIN_ERROR });
   }
 
